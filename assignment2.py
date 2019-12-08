@@ -15,8 +15,8 @@ import torch.nn.functional as F
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-import math
+#import seaborn as sns
+#import math
 
 dataset = pd.read_csv('CMP3751M_CMP9772M_ML_Assignment 2-dataset-nuclear_plants_final.csv')
 dataset.columns = dataset.columns.str.strip().str.replace(' ', '')
@@ -94,21 +94,17 @@ y = dataset.iloc[:, [0]].values
 # Train - Test Split (Randomised)
 def train_test_split(X,Y,train_split):
     X_train = []
-    X_test = []
-    Y_train = []
     Y_test = []
+    np.random.shuffle(X)
+    np.random.shuffle(Y)
     for position in range(len(X)):
         if position >= len(X)*train_split:
-#            
-            X_test.append(X[position])
             Y_test.append(Y[position])
         else:
             X_train.append(X[position])
-            Y_train.append(Y[position])
-    return X_train, X_test, Y_train, Y_test
+    return X_train, Y_test
 
-X_train, X_test, Y_train, Y_test = train_test_split(x,y,0.9)
-
+X_train, Y_test = train_test_split(x,y,0.9)
 # ANN architecture creation
 # Takes in a specified input and hidden size, within it uses the sigmoid function as the non-linear
 # activation function as well as the logistic function
@@ -121,9 +117,9 @@ class Model(torch.nn.Module):
             self.fc1 = torch.nn.Linear(self.input_size, self.hidden_size)
             self.sigmoid = torch.nn.Sigmoid()
             self.fc2 = torch.nn.Linear(self.hidden_size, self.hidden_size)
-            self.sigmoid = torch.nn.Sigmoid()
+            self.sigmoid2 = torch.nn.Sigmoid()
             self.fc3 = torch.nn.Linear(self.hidden_size, 1)
-            self.sigmoid = torch.nn.Sigmoid()
+            self.output = torch.nn.Sigmoid()
         def forward(self, x):
             hidden = self.fc1(x)
             sigmoid1 = self.sigmoid(hidden)
@@ -134,8 +130,6 @@ class Model(torch.nn.Module):
             return output
 # Creation of tensor objects as floats - variables taken from the train/test split above
 x_train = torch.FloatTensor(X_train)
-y_train = torch.FloatTensor(Y_train)
-x_test = torch.FloatTensor(X_test)
 y_test = torch.FloatTensor(Y_test)
 
 # ANN instantiation
@@ -144,33 +138,42 @@ model = Model(x_train.shape[1], 500)
 
 # define the loss function using the BCELoss (Binary Cross Entropy) and
 # define the optimiser with SGD (Stochastic Gradient Descent), with a learning rate of 0.01
-criterion = torch.nn.CrossEntropyLoss()
+criterion = torch.nn.BCEWithLogitsLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr = 0.01)
 
+y_padData = F.pad(input=y_test, pad=(0,0,0,798), mode='constant', value=0)
 # Create variables to be used in the loop below, i.e. the epochs are the number of iteration
 epoch = 10
 correct = 0
 total = 0
 accuracyList = []
 epochList = []
+
+# Iterate over epochs range
 for epoch in range(epoch):  
     # We first pass the training data to the model before perform a forward pass. After this we compute the loss
     y_pred = model(x_train)
     optimizer.zero_grad()
-    loss = criterion(y_pred.view(-1,897), y_test.view(-1,99))
+    loss = criterion(y_pred, y_padData)
     # Now we perform a backward pass and update weights.
     loss.backward()
     optimizer.step()
     # Below is for calculating the accuracy percentage
-    total += y_train.shape[0]
+    total += x_train.shape[0]
     y_pred = (y_pred>0.5).float()
-    correct += (y_pred == y_test).sum().item()
+    correct += (y_pred == x_train).sum().item()
     
     accuracy = 100 * correct / total
-#    print("Epoch {} Accuracy: {}".format(epoch, accuracy)) # List accuracy for each epoch
+    print("Epoch {} Accuracy: {}".format(epoch, accuracy)) # List accuracy for each epoch
     accuracyList.append(accuracy)
     epochList.append(epoch)
-# Print the accuracy of the ANN and plot
+# Print the accuracy of the ANN
 accuracy = 100 * correct / total
-print("Overal Accuracy: {}%".format(accuracy))
+print("Overal Accuracy: {}".format(accuracy))
+
+# Show Graph
+plt.xlabel("Epoch Iter")
+plt.ylabel("Accuracy of Epochs")
+plt.title("Accuracy of ANN")
 plt.plot(epochList, accuracyList)
+plt.show()
