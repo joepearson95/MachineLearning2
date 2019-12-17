@@ -46,9 +46,31 @@ def describe(dataset):
     return "Count: " + str(count), "Mean: " + str(mean), "Variance: " + str(var), "Standard Deviation: " + str(std), "Minimum: " + str(minimum), "Maxmimum: " + str(maximum), "25%: " + str(twentyFivePercent), "50%: " + str(fiftyPercent), "75%: " + str(seventyFivePercent), "Data Type: " + str(dtype)
 
 # Loop the data retrieved from the describe function
+for i in describe(dataset['Power_range_sensor_1']):
+    print("Power_range_sensor_1: " + i)
+for i in describe(dataset['Power_range_sensor_2']):
+    print("Power_range_sensor_2: " + i)
+for i in describe(dataset['Power_range_sensor_3']):
+    print("Power_range_sensor_3: " + i)
+for i in describe(dataset['Power_range_sensor_4']):
+    print("Power_range_sensor_4" + i)
 for i in describe(dataset['Pressure_sensor_1']):
-   print(i)
-
+    print("Pressure_sensor_1: " + i)
+for i in describe(dataset['Pressure_sensor_2']):
+    print("Pressure_sensor_2: " + i)
+for i in describe(dataset['Pressure_sensor_3']):
+    print("Pressure_sensor_3: " + i)
+for i in describe(dataset['Pressure_sensor_4']):
+    print("Pressure_sensor_4: " + i)
+for i in describe(dataset['Vibration_sensor_1']):
+    print("Vibration_sensor_1: " + i)
+for i in describe(dataset['Vibration_sensor_2']):
+    print("Vibration_sensor_2: " + i)
+for i in describe(dataset['Vibration_sensor_3']):
+    print("Vibration_sensor_3: " + i)
+for i in describe(dataset['Vibration_sensor_4']):
+    print("Vibration_sensor_4: " + i)
+    
 # Boxplot for the status and vibration sensor classes
 sns.boxplot(y=dataset['Status'], x=dataset['Vibration_sensor_1'], width=0.5)
 plt.title('Boxplot for the status of vibration sensor 1')
@@ -83,20 +105,20 @@ dataset.replace(clean_up, inplace=True)
 # Artificial Neural Network
 
 # Collect a random train test split 
-def train_test_split(df, test_size):
+def train_test_split(dataframeToSplit, test_size):
     # check that the required size given is a float and obtain the test size percentage from param
     if isinstance(test_size, float):
-        test_size = round(test_size * len(df))
+        test_size = round(test_size * len(dataframeToSplit))
 
     # access the index column and select random values from the dataset based on this
-    indices = df.index.tolist()
+    indices = dataframeToSplit.index.tolist()
     test_indices = random.sample(population=indices, k=test_size)
     
     # return the relevant train and test datasets
-    test_df = df.loc[test_indices]
-    train_df = df.drop(test_indices)
+    Ytest = dataframeToSplit.loc[test_indices]
+    Xtrain = dataframeToSplit.drop(test_indices)
     
-    return train_df, test_df
+    return Xtrain, Ytest
 
 # Check for occurances of classifiers within dataset
 def check_purity(data):
@@ -226,7 +248,7 @@ def type_of_feat(dataframe):
     return types
 
 # Creation of decision tree, taking in a dataframe. Keeping it simple as possible for main program
-def decision_tree(dataframe, count=0, min_samples=2, max_depth=5, rand_space=None):
+def decision_tree(dataframe, count=0, min_samples=50, max_depth=10, rand_space=None):
     # Checking if it is a np 2-d array. Then instantiating the data variable accordingly
     if count == 0:
         global COL_H, FEAT_TYPES # Create the global variables
@@ -295,8 +317,8 @@ def class_ex(example, tree):
         return class_ex(example, last_tree)
     
 # Compute the predicted value from a given dataset and tree
-def tree_prediction(test_df, tree):
-    prediction = test_df.apply(class_ex, args=(tree,), axis=1)
+def tree_prediction(Ytest, tree):
+    prediction = Ytest.apply(class_ex, args=(tree,), axis=1)
     return prediction
 
 # Calculate the accuracy from a given dataframe and the status column
@@ -308,31 +330,31 @@ def accuracy(dataframe, status):
     return accuracy
 
 # Function to return a given dataset with randomised indices based on the length of the dataset given and the number of rows wanted
-def bootstraper(train_df, sizeNo):
-    indices = np.random.randint(low=0, high=len(train_df), size=sizeNo) # Random int in range of dataset len and rows required
-    final_bootstrap = train_df.iloc[indices] # The dataset to be returned
+def bootstraper(Xtrain, sizeNo):
+    indices = np.random.randint(low=0, high=len(Xtrain), size=sizeNo) # Random int in range of dataset len and rows required
+    final_bootstrap = Xtrain.iloc[indices] # The dataset to be returned
     return final_bootstrap
 
 # Function to create a random forest based on the supplied dataset, amount of trees, features, its max depth and given indices
-def rand_forest_alg(train_df, trees, sizeNo, noFeatures, max_depth):
+def rand_forest_alg(Xtrain, trees, sizeNo, noFeatures, max_depth):
     forest = [] # List of the threes
     # Iterate the range of the trees param given, obtaining the indices from bootstraper function based on the
     # dataset given and amount given. Then create a tree based on said data, the depth supplied from the param and
     # the random amount of indices supplied from the features param
     for t in range(trees):
-        bootData = bootstraper(train_df, sizeNo)
+        bootData = bootstraper(Xtrain, sizeNo)
         tree = decision_tree(bootData, max_depth=max_depth, rand_space=noFeatures)
         forest.append(tree)
     return forest
 
 # Calculate the prediction of a forest and supplied dataframe
-def forest_prediction(test_df, forest):
+def forest_prediction(Ytest, forest):
     predictions = {} # Dictionairy containing all predictions
     # Loop over the length of a given forest and assign the trees number to a string and then to a variable called col_key
     # then obtain the prediction for the tree based on each loop before appending said prediction to the predcition dictionairy
     for i in range(len(forest)):
         col_key = "tree_{}".format(i)
-        tree_predictions = tree_prediction(test_df, tree=forest[i])
+        tree_predictions = tree_prediction(Ytest, tree=forest[i])
         predictions[col_key] = tree_predictions
     
     # Obtain a pandas dataframe with the predictions dictionairy and show it based on a basic index
@@ -367,10 +389,10 @@ class Model(torch.nn.Module):
             return output
 
 # Create variables to be used in the loop below, i.e. the epochs are the number of iteration
-def train_model(epoch, train_df, test_df):
+def train_model(epoch, Xtrain, Ytest):
     # Create a pytorch tensor using the dataframes supplied - they will be floats and thus the tensor created must be a float tensor too
-    x_train = torch.FloatTensor(train_df.values)
-    y_test = torch.FloatTensor(test_df.values)
+    x_train = torch.FloatTensor(Xtrain.values)
+    y_test = torch.FloatTensor(Ytest.values)
     # ANN instantiation
     model = Model(x_train.shape[1], 500)
 #    print(model) # Print the model architecture
@@ -400,7 +422,7 @@ def train_model(epoch, train_df, test_df):
         y_pred = (y_pred>0.5).float()
         correct += (y_pred == x_train).sum().item()
         accuracy = 100 * correct / total
-        # print("Epoch {} Accuracy: {}%".format(epoch + 1, round(accuracy,2))) # List accuracy for each epoch, added 1 to epoch for readability purposes
+        print("Epoch {} Accuracy: {}%".format(epoch + 1, round(accuracy,2))) # List accuracy for each epoch, added 1 to epoch for readability purposes
         accuracyList.append(accuracy)
     return accuracyList
 
@@ -414,17 +436,17 @@ def cross_validation(dataset, k_folds, cv_type, neurons=500, trees=4,):
     total = 0
     # Iterate over epochs range
     for i in range(k_folds):  
-        train_df = k_folded_data.copy() # creating a copy of the split dataset for working purposes
-        test_df = k_folded_data[i] # select a section of this array based on index supplied in iteration
-        del train_df[i] # delete the test set from this iteration before concatenating the remainding sets for training
-        train_df = pd.concat(train_df, sort=False) # Concatenate the remaining training sets
+        Xtrain = k_folded_data.copy() # creating a copy of the split dataset for working purposes
+        Ytest = k_folded_data[i] # select a section of this array based on index supplied in iteration
+        del Xtrain[i] # delete the test set from this iteration before concatenating the remainding sets for training
+        Xtrain = pd.concat(Xtrain, sort=False) # Concatenate the remaining training sets
         # If the cv_type is a nerual network, begin creating FloatTensors for the given train/test dataframes before computing
         # the accuracy from the ANN algorithm functions above
         if cv_type == "ANN":
-            padData = F.pad(input=torch.FloatTensor(test_df.values), pad=(0,0,0,(train_df.shape[0] - test_df.shape[0])), mode='constant', value=0)
-            model = Model(torch.FloatTensor(train_df.values).shape[1], neurons)
+            padData = F.pad(input=torch.FloatTensor(Ytest.values), pad=(0,0,0,(Xtrain.shape[0] - Ytest.shape[0])), mode='constant', value=0)
+            model = Model(torch.FloatTensor(Xtrain.values).shape[1], neurons)
             # We first pass the training data to the model before perform a forward pass. After this we compute the loss
-            y_pred = model(torch.FloatTensor(train_df.values))
+            y_pred = model(torch.FloatTensor(Xtrain.values))
             criterion = torch.nn.BCEWithLogitsLoss()
             optimizer = torch.optim.SGD(model.parameters(), lr = 1)
             optimizer.zero_grad()
@@ -433,18 +455,18 @@ def cross_validation(dataset, k_folds, cv_type, neurons=500, trees=4,):
             loss.backward()
             optimizer.step()
             # Below is for calculating the accuracy percentage
-            total += torch.FloatTensor(train_df.values).shape[0]
+            total += torch.FloatTensor(Xtrain.values).shape[0]
             y_pred = (y_pred>0.5).float()
-            correct += (y_pred == torch.FloatTensor(train_df.values)).sum().item()
+            correct += (y_pred == torch.FloatTensor(Xtrain.values)).sum().item()
             curr_forest_accuracy = 100 * correct / total
             # print("Epoch {} Accuracy: {}%".format(i + 1, round(curr_forest_accuracy,2))) # List accuracy for each epoch, added 1 to epoch for readability purposes
             cv_accuracy.append(curr_forest_accuracy)
         else:
             # If the random forest classifer algorithm is specified then compute the accuracy by using the functions above for the
             # random forest classifier.
-            forest = rand_forest_alg(train_df, trees=4, sizeNo=800, noFeatures=2, max_depth=4)
-            predictions = forest_prediction(test_df, forest)
-            curr_accuracy = accuracy(predictions, test_df.Status)
+            forest = rand_forest_alg(Xtrain, trees=4, sizeNo=800, noFeatures=2, max_depth=4)
+            predictions = forest_prediction(Ytest, forest)
+            curr_accuracy = accuracy(predictions, Ytest.Status)
             cv_accuracy.append(curr_accuracy)
     return cv_accuracy
 
@@ -458,7 +480,7 @@ def create_cv_graph(title, k_fold_no, cv_accuracy_percent):
 
 # Variable creation for the below function calls    
 # Get a random 90:10 random data split
-train_df, test_df = train_test_split(dataset, test_size=0.1)
+Xtrain, Ytest = train_test_split(dataset, test_size=0.1)
 kfolds = 10
 # Vars for random tree
 treeNo = 500
@@ -466,26 +488,31 @@ sizeNum = 800
 featuresNum = 2
 maxDepth = 4
 # Vars for ANN
-neuronsNum = 50
+neuronsNum = 500
+epochs = 150
 
 # Calculate the accuracy of a random tree forest classifier
 randforest_accuracy = []
 # Takes in given amount of trees, bootstrapping size, feature size and max depth
-forest = rand_forest_alg(train_df, trees=treeNo, sizeNo=sizeNum, noFeatures=featuresNum, max_depth=maxDepth) 
-predictions = forest_prediction(test_df, forest)
-forest_accuracy = accuracy(predictions, test_df.Status)
+forest = rand_forest_alg(Xtrain, trees=treeNo, sizeNo=sizeNum, noFeatures=featuresNum, max_depth=maxDepth) 
+predictions = forest_prediction(Ytest, forest)
+forest_accuracy = accuracy(predictions, Ytest.Status)
 randforest_accuracy.append(forest_accuracy)
 print("Random Forest accuracy: {}%".format(round(100 * np.mean(randforest_accuracy))))
 
 # Accuracy of the ANN
-accuracyList = train_model(kfolds, train_df, test_df)
+accuracyList = train_model(epochs, Xtrain, Ytest)
 print("Accuracy of ANN: {}%".format(round(np.average(accuracyList),2)))
+plt.xlabel("Epochs")
+plt.ylabel("Accuracy")
+plt.title("ANN Accuracy")
+plt.plot(range(0,epochs), accuracyList)
 # Print the accuracy of the random forest classifier
 forest_cv_accuracy = cross_validation(dataset, kfolds, cv_type="Forest")
-print("Random Forest accuracy with cross validation: {}%".format(round(100 * np.mean(forest_cv_accuracy))))
+print("Random Forest accuracy with cross validation: Tree Number {} {}%".format(treeNo, round(100 * np.mean(forest_cv_accuracy))))
 # Print the accuracy of the ANN
 ann_cv_accuracy = cross_validation(dataset, kfolds, cv_type="ANN", neurons=neuronsNum)
-print("ANN accuracy with cross validation: {}%".format(round(np.average(ann_cv_accuracy))))
+print("ANN accuracy with cross validation: {} {}%".format(neuronsNum, round(np.mean(ann_cv_accuracy))))
 # Create the CV graphs    
 create_cv_graph("CV Accuracy of Random Forest", kfolds, forest_cv_accuracy)
-create_cv_graph("CV Accuracy of ANN", kfolds, forest_cv_accuracy)
+create_cv_graph("CV Accuracy of ANN", kfolds, ann_cv_accuracy)
